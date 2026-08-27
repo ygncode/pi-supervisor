@@ -18,7 +18,7 @@
     "typebox": "*"
   },
   "scripts": {
-    "test": "npx --yes tsx classifier.test.ts"
+    "test": "npx --yes tsx classifier.test.ts && npx --yes tsx lifecycle.test.ts"
   },
   "pi": {
     "extensions": ["./index.ts"]

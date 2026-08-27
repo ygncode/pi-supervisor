@@ -6,6 +6,7 @@ export interface PaneClassification {
   status: PiPaneStatus;
   dangerous: boolean;
   question: boolean;
+  unresolvedFailure: boolean;
   piLike: boolean;
   fingerprint: string;
   excerpt: string;
@@ -36,6 +37,10 @@ const DANGEROUS = /(?:\brm\s+-[^\n]*r|\bsudo\b|\bgit\s+(?:push|reset\s+--hard|cl
 
 const QUESTION = /(?:\?\s*$|please (?:choose|confirm)|which (?:option|approach)|would you like|should i|need your (?:input|decision))/im;
 
+// Keep the automatic reaper conservative. These patterns focus on terminal
+// outcomes rather than any occurrence of words such as "error" in a summary.
+const UNRESOLVED_FAILURE = /(?:\b(?:tests?|build|typecheck|lint|migration|deployment)\s+(?:has\s+)?failed\b|\bfailed\s+(?:tests?|build|typecheck|lint|migration|deployment)\b|\bcommand\s+(?:failed|exited)\s+(?:with\s+)?(?:code|status)\s*[1-9]\d*\b|\b(?:task|work|implementation)\s+(?:is\s+)?(?:blocked|incomplete|not\s+complete)\b|\b(?:unable|could not|cannot)\s+to\s+complete\b|\bunresolved\s+(?:failure|error|issue)\b)/im;
+
 // Heuristics for "does this tmux pane look like a pi TUI?" (used by `list`):
 // startup help line, token-usage status (↑/↓ counters), or the model input
 // prompt line "(provider) model • thinking-level".
@@ -64,17 +69,20 @@ function meaningfulExcerpt(cleaned: string): string {
 
 export function classifyPane(raw: string, exists = true): PaneClassification {
   if (!exists) {
-    return { status: "missing", dangerous: false, question: false, piLike: false, fingerprint: "missing", excerpt: "tmux session does not exist" };
+    return { status: "missing", dangerous: false, question: false, unresolvedFailure: false, piLike: false, fingerprint: "missing", excerpt: "tmux session does not exist" };
   }
 
   const cleaned = cleanPane(raw);
   const excerpt = meaningfulExcerpt(cleaned);
   // capture-pane includes scrollback, so old spinners and dialogs may remain
   // hundreds of lines above the current prompt. Classify only the live tail.
-  const stateWindow = cleaned.split("\n").slice(-16).join("\n");
+  const liveLines = cleaned.split("\n");
+  const stateWindow = liveLines.slice(-16).join("\n");
+  const outcomeWindow = liveLines.slice(-24).join("\n");
   const dialog = DIALOG.test(stateWindow) || DIALOG_SELECTED.test(stateWindow) || DIALOG_OPTION.test(stateWindow) || DIALOG_HEADER.test(stateWindow);
   const working = !dialog && WORKING.test(stateWindow);
   const status: PiPaneStatus = working ? "working" : dialog ? "dialog" : "idle";
+  const unresolvedFailure = status === "idle" && UNRESOLVED_FAILURE.test(outcomeWindow);
   const stableText = excerpt
     .replace(/^[⠁-⠿]\s*/gm, "")
     .replace(/\(\d+[smh](?:\s+\d+[smh])?[^)]*\)/g, "(elapsed)")
@@ -86,6 +94,7 @@ export function classifyPane(raw: string, exists = true): PaneClassification {
     status,
     dangerous: dialog && DANGEROUS.test(cleaned),
     question: dialog || QUESTION.test(excerpt),
+    unresolvedFailure,
     piLike: PI_LIKE.test(cleaned),
     fingerprint,
     excerpt,

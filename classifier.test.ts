@@ -51,6 +51,28 @@ const idle = classifyPane(` Done — created /tmp/pisup-probe-1.
 0.0%/1.0M (auto)                                                                                                                                                        (deepseek) deepseek-v4-pro • max
 `);
 assert.equal(idle.status, "idle");
+assert.equal(idle.unresolvedFailure, false);
+
+// A terminal failure in the live tail must be preserved by automatic cleanup.
+const failed = classifyPane(`Test run completed.
+
+Command exited with code 1
+
+────────────────────────────────────────────────────────────────
+~/project • worker
+(openai) model • high`);
+assert.equal(failed.status, "idle");
+assert.equal(failed.unresolvedFailure, true);
+
+// Merely discussing a fixed error must not prevent cleanup.
+const fixedError = classifyPane(`Done — fixed the authentication error and added regression coverage.
+
+All tests passed.
+
+────────────────────────────────────────────────────────────────
+~/project • worker
+(openai) model • high`);
+assert.equal(fixedError.unresolvedFailure, false);
 
 // Scrollback can retain old working spinners after the agent has completed.
 // Only the live pane tail should determine state.
@@ -99,6 +121,7 @@ assert.equal(numberedList.status, "idle");
 const missing = classifyPane("", false);
 assert.equal(missing.status, "missing");
 assert.equal(missing.piLike, false);
+assert.equal(missing.unresolvedFailure, false);
 
 // pi-like detection: startup screen
 const piLike = classifyPane(` pi v0.83.0

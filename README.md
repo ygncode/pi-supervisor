@@ -13,9 +13,12 @@ You do **not** need any other supervisor extension. Pi Supervisor works on its o
 - Notify the supervising Pi when an agent finishes or asks a question.
 - Capture a supervised session's recent output.
 - Send follow-up instructions to a specific agent.
-- Start new Pi sessions directly from Pi.
+- Start new Pi sessions directly from Pi and mark them as supervisor-managed.
+- Close validated completed agents instead of leaking tmux sessions.
+- Auto-close clean, unattached managed sessions after a 30-minute idle grace period.
+- Preview and interactively clean up completed legacy Pi sessions.
 - Show a persistent status widget in the Pi footer.
-- Require explicit approval before sending responses to potentially dangerous dialogs.
+- Warn and require explicit approval before responses to potentially dangerous dialogs.
 - Restore your monitored sessions after Pi reloads or resumes.
 
 ## Requirements
@@ -86,7 +89,10 @@ If there is more than one session to choose from, Pi shows a selector.
 ```text
 /pi-supervise status
 /pi-send code-review :: Run the tests and report any failures.
+/pi-supervise close code-review
 ```
+
+`close` succeeds only for an unattached supervisor-managed session that is idle and does not show a dialog or unresolved failure. The supervising model is also instructed to close an agent after validating successful completion.
 
 When only one session is supervised, the session name is optional:
 
@@ -100,9 +106,11 @@ When only one session is supervised, the session name is optional:
 | --- | --- |
 | `/pi-supervise` | Choose an existing tmux session to monitor |
 | `/pi-supervise <session>` | Start monitoring a named session |
-| `/pi-supervise status` | Show the status of monitored sessions |
-| `/pi-supervise stop <session>` | Stop monitoring one session |
-| `/pi-supervise stop` | Stop monitoring all sessions |
+| `/pi-supervise status` | Show state, ownership, and auto-close status |
+| `/pi-supervise close <session>` | Close a validated completed managed session |
+| `/pi-supervise cleanup` | Preview legacy cleanup, then request confirmation |
+| `/pi-supervise stop <session>` | Stop monitoring one session without closing it |
+| `/pi-supervise stop` | Stop monitoring all sessions without closing them |
 | `/pi-send <message>` | Send a message when one session is monitored |
 | `/pi-send <session> :: <message>` | Send a message to a named session |
 | `/pi-spawn -m <model> [-n <name>] [-d <dir>]` | Start and monitor a new Pi session |
@@ -116,8 +124,10 @@ Pi can call the `pi_supervisor` tool to manage sessions without slash commands. 
 - `status` — get all monitored-session statuses
 - `capture` — inspect recent output from a session
 - `send` — send a response or instruction
-- `stop` — stop one or all monitors
-- `spawn` — start a new Pi session with a selected model
+- `close` — close one validated completed managed session
+- `cleanup` — preview eligible legacy sessions without deleting anything
+- `stop` — stop one or all monitors without closing sessions
+- `spawn` — start a new managed Pi session with a selected model
 
 ## How monitoring works
 
@@ -132,13 +142,19 @@ Pi Supervisor checks monitored tmux panes every five seconds and reports these s
 
 The supervising Pi is notified when a session reaches a stable waiting state or finishes a turn. Routine follow-up can be handled automatically, while potentially destructive, deployment, production, credential, or security-related decisions are left for you to approve.
 
+Sessions created by `pi-spawn` carry tmux ownership metadata. After a clean settled session has remained idle and unattached for 30 minutes, its owning supervisor closes it automatically. Working agents, dialogs, likely questions, unresolved failures, attached sessions, manually started sessions, and sessions owned by another supervisor are preserved.
+
+For older unmarked sessions, `/pi-supervise cleanup` performs a conservative scan. It lists the exact eligible sessions and asks for interactive confirmation before closing anything. The `pi_supervisor cleanup` tool is always preview-only.
+
 ## Important notes
 
 - All supervised agents must run inside tmux.
 - Each agent uses its own Pi configuration, model access, and working directory.
 - Messages sent by Pi Supervisor are entered into Pi's single-line input box, so line breaks are converted to spaces.
-- Status detection is based on terminal output and is intentionally conservative; inspect the pane before approving sensitive actions.
-- Stopping supervision does not stop or delete the underlying tmux session.
+- Status and unresolved-failure detection are based on terminal output and intentionally err toward preserving sessions.
+- Sensitive-dialog protection is reinforced through supervisor instructions; inspect the pane before approving sensitive actions.
+- Stopping supervision does not stop or delete the underlying tmux session; use `close` for validated managed sessions.
+- Automatic cleanup never closes unmarked legacy sessions.
 
 ## Troubleshooting
 
@@ -163,7 +179,7 @@ Then run `/reload` and try `/pi-supervise <session-name>` again.
 
 ## Development
 
-Run the classifier tests from a checkout:
+Run the classifier and lifecycle tests from a checkout:
 
 ```bash
 npm test
