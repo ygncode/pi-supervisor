@@ -129,6 +129,29 @@ Pi can call the `pi_supervisor` tool to manage sessions without slash commands. 
 - `stop` — stop one or all monitors without closing sessions
 - `spawn` — start a new managed Pi session with a selected model
 
+## Limit how many sessions it spawns
+
+By default there is no limit. To cap how many Pi sessions one supervisor can
+spawn, set `piSupervisor.maxSessions`:
+
+```json
+{
+  "piSupervisor": { "maxSessions": 4 }
+}
+```
+
+- **Everywhere:** put it in `~/.pi/agent/settings.json`.
+- **One project:** put it in that project's `.pi/settings.json`. This overrides
+  the global value; set a higher number there to allow more in that project.
+  Project settings load only after you trust the project.
+
+The limit counts this supervisor's spawned sessions that are still running in
+tmux, so closing one frees a slot. Sessions you started yourself and then
+supervise with `/pi-supervise` do not count. `0`, a negative number or a
+missing value means unlimited. When the limit is reached, `/pi-spawn` and the
+`spawn` tool action fail with a message naming the running sessions. Run
+`/reload` after changing the setting.
+
 ## How monitoring works
 
 Pi Supervisor checks monitored tmux panes every five seconds and reports these states:

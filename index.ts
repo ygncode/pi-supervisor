@@ -7,6 +7,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { classifyPane, type PiPaneStatus, type PaneClassification } from "./classifier";
+import { maxSessionsFromSettings, spawnLimitReason } from "./limits";
 import { notifySupervisor } from "./notifications";
 import {
   automaticCloseBlockReason,
@@ -519,6 +520,15 @@ export default function piSupervisor(pi: ExtensionAPI) {
     const sessions = await listSessions();
     const session = name?.trim() || `pi-${model.replace(/[^a-zA-Z0-9._-]/g, "-")}`;
     if (sessions.includes(session)) throw new Error(`tmux session already exists: ${session}`);
+    // Only this supervisor's live spawned sessions count; closed ones free a slot.
+    const owner = ctx.sessionManager.getSessionId();
+    const mine: string[] = [];
+    for (const name of sessions) {
+      const metadata = await readSessionMetadata(name);
+      if (metadata.managed && metadata.owner === owner) mine.push(name);
+    }
+    const limitReason = spawnLimitReason(maxSessionsFromSettings(pi.getSettings()), mine);
+    if (limitReason) throw new Error(limitReason);
     const cwd = dir?.trim() || ctx.cwd;
     const flags = ["--model", model, "--name", session];
     if (provider?.trim()) flags.push("--provider", provider.trim());
