@@ -17,7 +17,8 @@ const ANSI = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))/g;
 // Pi renders transient status lines while the agent is active:
 //   " Thinking..."  (leading space, then dots)
 //   " ⠇ Working..." (Braille spinner + "Working...")
-const WORKING = /^\s*(?:Thinking|Working|Ruminating|Compacting|Baking|Brewing|Crunching|Finagling|Hatching|Pondering|Whirring|Wandering|Channelling|Churning|Cogitating|Researching|Implementing|Testing|Building|Analyzing|Reading|Writing|Updating|Installing|Fixing|Reviewing|Planning|Searching)[…\.]{1,4}\s*$|^[⠁-⠿]\s*Working[…\.]{1,4}\s*$/im;
+//   " ⠸ Working"    (newer Pi: spinner without trailing dots)
+const WORKING = /^\s*(?:Thinking|Working|Ruminating|Compacting|Baking|Brewing|Crunching|Finagling|Hatching|Pondering|Whirring|Wandering|Channelling|Churning|Cogitating|Researching|Implementing|Testing|Building|Analyzing|Reading|Writing|Updating|Installing|Fixing|Reviewing|Planning|Searching)[…\.]{1,4}\s*$|^\s*[⠁-⠿]\s*(?:Working|Thinking)[…\.]{0,4}\s*$/im;
 
 // Pi renders decision/selector dialogs (ui.select, ui.confirm, ask_user_question,
 // trust prompts, model selectors) with these markers:

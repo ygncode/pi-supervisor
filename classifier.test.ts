@@ -16,6 +16,23 @@ const working = classifyPane(`use the ask_user_question tool to ask me a questio
 assert.equal(working.status, "working");
 assert.equal(working.dangerous, false);
 
+// Real fixture: newer Pi draws the spinner without trailing dots, above the editor and footer
+const workingNoDots = classifyPane(` Now I'm laying out the product detail page.
+
+ ⠙ Working
+
+────────────────────────────────────────────────────────────────────────────────
+
+────────────────────────────────────────────────────────────────────────────────
+~/ygncode-lab/ygnconnect (main) • fl-home
+↑58 ↓42k R2.7M W127k CH99.0% $2.409 (sub) 15.2%/1.0M (auto)  claude-opus-5-5 • m
+router:off
+`);
+assert.equal(workingNoDots.status, "working");
+
+// A plain "Working" word in agent output (no spinner) is not a working state
+assert.equal(classifyPane(`Summary of the tests:\nWorking\n`).status, "idle");
+
 // Real fixture: ask_user_question dialog rendered by pi's ui.select
 const dialog = classifyPane(` Would you like to proceed with option A or option B?
 

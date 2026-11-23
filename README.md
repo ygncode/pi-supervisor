@@ -140,7 +140,7 @@ Pi Supervisor checks monitored tmux panes every five seconds and reports these s
 | `dialog` | The agent is waiting for a selection, confirmation, or answer |
 | `missing` | The tmux session no longer exists |
 
-The supervising Pi is notified when a session reaches a stable waiting state or finishes a turn. Routine follow-up can be handled automatically, while potentially destructive, deployment, production, credential, or security-related decisions are left for you to approve.
+The supervising Pi is notified when a session reaches a stable waiting state or finishes a turn. Events use hidden custom steering messages: they reach the next agent turn (or wake an idle parent) without filling the visible user follow-up queue. The status widget and capture tool remain available. Routine follow-up can be handled automatically, while potentially destructive, deployment, production, credential, or security-related decisions are left for you to approve.
 
 Sessions created by `pi-spawn` carry tmux ownership metadata. After a clean settled session has remained idle and unattached for 30 minutes, its owning supervisor closes it automatically. Working agents, dialogs, likely questions, unresolved failures, attached sessions, manually started sessions, and sessions owned by another supervisor are preserved.
 
@@ -186,6 +186,9 @@ npm test
 ```
 
 After changing the extension, run `/reload` in each already-running Pi process.
+Old queued notifications are preserved, not silently deleted. Press **Alt+Up** to
+move the existing queue into the editor and restore conversation space. Review
+or save real queued user requests before clearing the editor with Ctrl+C.
 
 ## License
 

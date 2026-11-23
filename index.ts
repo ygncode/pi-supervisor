@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -6,6 +7,7 @@ import { StringEnum } from "@earendil-works/pi-ai";
 import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 import { classifyPane, type PiPaneStatus, type PaneClassification } from "./classifier";
+import { notifySupervisor } from "./notifications";
 import {
   automaticCloseBlockReason,
   explicitCloseBlockReason,
@@ -132,7 +134,6 @@ export default function piSupervisor(pi: ExtensionAPI) {
   }
 
   function wakeSupervisor(
-    ctx: ExtensionContext,
     item: WatchedSession,
     classification: PaneClassification,
     notificationKey = classification.fingerprint,
@@ -145,8 +146,7 @@ export default function piSupervisor(pi: ExtensionAPI) {
       ? "STOP: this appears to be an explicit destructive/deployment/security permission request. Obtain explicit user approval before sending anything to the supervised Pi."
       : "Supervise autonomously: inspect the relevant repository and the supervised Pi pane as needed, answer routine questions, send the appropriate response or next checkpoint through pi_supervisor, and continue managing until validated completion.";
     const message = `[Pi Supervisor event]\nSession: ${item.name}\nState: ${stateLabel}${classification.question ? " (question or decision likely)" : ""}\n\n${safety}\n\nRecent Pi pane:\n---\n${classification.excerpt}\n---`;
-    if (ctx.isIdle()) pi.sendUserMessage(message);
-    else pi.sendUserMessage(message, { deliverAs: "followUp" });
+    notifySupervisor(pi, message);
     return true;
   }
 
@@ -397,12 +397,12 @@ export default function piSupervisor(pi: ExtensionAPI) {
     // Unlike visual polling, this cannot miss a brief idle state when another
     // extension immediately queues follow-up work after the agent's final reply.
     if (settledSignal && settledSignal !== item.lastSettledSignal) {
-      const queued = wakeSupervisor(ctx, item, classification, `settled:${settledSignal}`, "agent settled");
+      const queued = wakeSupervisor(item, classification, `settled:${settledSignal}`, "agent settled");
       if (queued) item.lastSettledSignal = settledSignal;
     }
 
     if ((classification.status === "idle" || classification.status === "dialog" || classification.status === "missing") && item.stableCount >= STABLE_POLLS) {
-      wakeSupervisor(ctx, item, classification);
+      wakeSupervisor(item, classification);
     }
   }
 
@@ -477,9 +477,12 @@ export default function piSupervisor(pi: ExtensionAPI) {
     const file = join(dir, "message.txt");
     try {
       await writeFile(file, message, { mode: 0o600 });
-      const loaded = await tmux(["load-buffer", file]);
+      // A named buffer per send: with the shared default buffer, two concurrent sends
+      // paste each other's text into the wrong sessions.
+      const buffer = `pi-supervisor-${randomUUID()}`;
+      const loaded = await tmux(["load-buffer", "-b", buffer, file]);
       if (loaded.code !== 0) throw new Error(loaded.stderr || "tmux load-buffer failed");
-      const pasted = await tmux(["paste-buffer", "-d", "-t", target]);
+      const pasted = await tmux(["paste-buffer", "-d", "-b", buffer, "-t", target]);
       if (pasted.code !== 0) throw new Error(pasted.stderr || "tmux paste-buffer failed");
       await new Promise((resolve) => setTimeout(resolve, 150));
       const submitted = await tmux(["send-keys", "-t", target, "Enter"]);
